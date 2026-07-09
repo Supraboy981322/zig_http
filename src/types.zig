@@ -25,6 +25,15 @@ pub const Connection = struct {
         else |_| {} // TODO: should I handle this?
         return .{ .closed = true };
     }
+
+    //pub fn sendStatusLine(self:Connection, status:std.http.Status) !void {
+    //    var buf:[1024]u8 = undefined;
+    //    var writer = self.stream.writer(self.io, &buf);
+    //    writer.interface.print("HTTP
+    //}
+
+    //pub fn sendHeaders(self:Connection, ) !void {
+    //}
 };
 
 pub const KVPair = struct{ key:[]const u8, value:[]const u8 };
