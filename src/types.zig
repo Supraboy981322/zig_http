@@ -89,10 +89,13 @@ pub const Headers = struct {
         return .{ .pairs = res };
     }
 
-    pub fn fromMapFast(comptime len:usize, map:[len][2][]const u8) Headers {
+    // NOTE: (for me) if this isn't inlined, it's a segfault
+    pub inline fn fromMapFast(map:anytype) Headers {
+        const len = comptime map.len;
+        const m = @as([len]struct{ []const u8, []const u8 }, map);
         var res:[len]KVPair = undefined;
-        inline for (map, 0..) |pair, i|
-            res[i] = .{ .key = pair[0], .value = pair[1] };
+        inline for (m, &res) |p, *r|
+            r.* = .{ .key = p[0], .value = p[1] };
         return .{ .pairs = res[0..] };
     }
 
