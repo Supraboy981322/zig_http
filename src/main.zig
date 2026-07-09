@@ -39,8 +39,8 @@ pub fn handler(conn:*Connection) !HandleResult {
 
     try render_buf.writer.print(
         \\.{{
-        \\    .method = {t},
-        \\    .page = {s},
+        \\    .method = .{t},
+        \\    .page = "{s}",
         \\    .version = .{{
         \\        .is_https = {},
         \\        .num = .{any},
@@ -69,7 +69,7 @@ pub fn handler(conn:*Connection) !HandleResult {
     try conn.beginResponse(.ok, .fromMap(.{
         .{ "Content-Length", len_str },
     }));
-    
+
     _ = try content.streamRemaining(&conn.writer.interface);
     try conn.writer.interface.flush();
 
