@@ -28,19 +28,16 @@ pub fn main(init:std.process.Init) !u8 {
     return 0;
 }
 
-pub fn handler(conn:Connection) !HandleResult {
-    const stream = conn.stream;
+pub fn handler(conn:*Connection) !HandleResult {
     const headers = conn.headers;
     const log = conn.log;
 
     log.request("recieved request", .{});
 
-    var writer_buf:[1024]u8 = undefined;
-    var writer = stream.writer(conn.io, &writer_buf);
+    var render_buf:std.Io.Writer.Allocating = .init(conn.alloc);
+    defer render_buf.deinit();
 
-    try writer.interface.print(
-        \\HTTP/1.1 200 OK
-        \\
+    try render_buf.writer.print(
         \\.{{
         \\    .method = {t},
         \\    .page = {s},
@@ -55,14 +52,26 @@ pub fn handler(conn:Connection) !HandleResult {
         headers.version.is_https,
         headers.version.num,
     });
-
-    for (headers.headers) |header| try writer.interface.print(
+    for (headers.headers) |header| try render_buf.writer.print(
         "        .{{ .key = \"{s}\", .value = \"{s}\" }},\n",
-        .{ header.key, header.value }
+        .{ header.key, header.value },
     );
+    try render_buf.writer.print("    }},\n}};\n", .{});
 
-    try writer.interface.print("    }},\n}};\n", .{});
-    try writer.interface.flush();
+
+    const rendered_len = render_buf.written().len;
+    try render_buf.writer.print("{d}", .{rendered_len});
+    const res = render_buf.written();
+    const len_str = res[rendered_len..];
+    const rendered = res[0..rendered_len];
+    var content:std.Io.Reader = .fixed(rendered);
+
+    try conn.beginResponse(.ok, try .fromMap(conn.alloc, &.{
+        .{ "Content-Length", len_str },
+    }));
+    
+    _ = try content.streamRemaining(&conn.writer.interface);
+    try conn.writer.interface.flush();
 
     return .done(.{});
 }
