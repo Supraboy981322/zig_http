@@ -1,6 +1,10 @@
 const std = @import("std");
 
-pub const HandlerFn = *const fn (Connection) anyerror!HandleResult;
+const assert = std.debug.assert;
+const Allocator = std.mem.Allocator;
+const Status = std.http.Status;
+
+pub const HandlerFn = *const fn (*Connection) anyerror!HandleResult;
 
 pub const HandleResult = struct {
     closed:bool = false,
@@ -18,25 +22,84 @@ pub const Connection = struct {
     headers:ParsedHeader,
     io:std.Io,
     comptime log:Log = .default,
+    status_sent:bool = false,
+    writer:*std.Io.net.Stream.Writer,
+    reader:*std.Io.net.Stream.Reader,
 
+    // WARNING: do not 'Connection.cancel(...)' *and* 'Connection.endResponse(...)'
     pub fn cancel(self:Connection) HandleResult {
-        if (self.stream.shutdown(self.io, .both)) |_|
-            self.stream.close(self.io)
-        else |_| {} // TODO: should I handle this?
+        self.stream.shutdown(self.io, .both) catch {
+            return .{ .closed = true };
+        };
+        self.stream.close(self.io);
         return .{ .closed = true };
     }
 
-    //pub fn sendStatusLine(self:Connection, status:std.http.Status) !void {
-    //    var buf:[1024]u8 = undefined;
-    //    var writer = self.stream.writer(self.io, &buf);
-    //    writer.interface.print("HTTP
-    //}
+    pub const SendStatusError = error{UnknownStatus} || std.Io.Writer.Error;
+    pub fn sendStatusLine(self:*Connection, status:Status) SendStatusError!void {
+        const name = status.phrase() orelse return error.UnknownStatus;
+        const num = @intFromEnum(status);
+        try self.writer.interface.print("HTTP/1.1 {d} {s}\r\n", .{num, name});
+        try self.writer.interface.flush();
+        self.status_sent = true;
+    }
 
-    //pub fn sendHeaders(self:Connection, ) !void {
-    //}
+    pub const SendHeaderMapError = error{OutOfMemory} || SendHeadersError;
+    pub fn sendHeadersMap(self:Connection, headers:[]const [2][]const u8) SendHeaderMapError!void {
+        try self.sendHeaders(try .fromMap(self.alloc, headers));
+    }
+
+    pub const SendHeadersError = std.Io.Writer.Error;
+    pub fn sendHeaders(self:Connection, headers:Headers) SendHeadersError!void {
+        assert(self.status_sent); //must call sendStatusLine(...) first
+
+        for (headers.pairs) |header|
+            try self.writer.interface.print("{s}: {s}\r\n", .{header.key, header.value});
+
+        try self.writer.interface.writeAll("\r\n");
+        try self.writer.interface.flush();
+    }
+
+    const ResponseError = SendStatusError || SendHeadersError;
+    pub fn beginResponse(self:*Connection, status:Status, headers:Headers) ResponseError!void {
+        try self.sendStatusLine(status);
+        try self.sendHeaders(headers);
+    }
+
+    // WARNING: do not 'Connection.cancel(...)' *and* 'Connection.endResponse(...)'
+    pub fn endResponse(self:Connection) std.Io.net.ShutdownError!HandleResult {
+        try self.stream.close(self.io, .both);
+        self.stream.close(self.io);
+        return .{ .closed = true };
+    }
 };
 
 pub const KVPair = struct{ key:[]const u8, value:[]const u8 };
+
+// TODO: iterator (?)
+pub const Headers = struct {
+    pairs:[]const KVPair,
+
+    // NOTE: the resulting keys and values are still owned by the provided map
+    //  (the KVPair slice is allocated, however)
+    pub fn fromMap(alloc:Allocator, map:[]const [2][]const u8) error{OutOfMemory}!Headers {
+        const res = try alloc.alloc(KVPair, map.len);
+        for (map, 0..) |pair, i|
+            res[i] = .{ .key = pair[0], .value = pair[1] };
+        return .{ .pairs = res };
+    }
+
+    pub fn fromMapFast(comptime len:usize, map:[len][2][]const u8) Headers {
+        var res:[len]KVPair = undefined;
+        inline for (map, 0..) |pair, i|
+            res[i] = .{ .key = pair[0], .value = pair[1] };
+        return .{ .pairs = res[0..] };
+    }
+
+    pub fn mk(pairs:[]const KVPair) Headers {
+        return .{ .pairs = pairs };
+    }
+};
 
 pub const Log = struct {
     info:Func,
@@ -48,7 +111,7 @@ pub const Log = struct {
     pub const Func = *const fn (comptime []const u8, anytype) void;
 
     // TODO: custom default
-    pub const default:Log = .{ 
+    pub const default:Log = .{
         .info = &std.log.info,
         .debug = &std.log.debug,
         .warn = &std.log.warn,
