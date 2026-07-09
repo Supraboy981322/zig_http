@@ -42,7 +42,7 @@ pub fn handler(conn:*Connection) !HandleResult {
         \\    .method = {t},
         \\    .page = {s},
         \\    .version = .{{
-        \\        .s = {},
+        \\        .is_https = {},
         \\        .num = .{any},
         \\    }},
         \\    .headers = &.{{

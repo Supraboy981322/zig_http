@@ -89,14 +89,19 @@ pub const Headers = struct {
         return .{ .pairs = res };
     }
 
+    //takes an array (or tuple) of (meaning comptime-known length) of string
+    //  tuples (two strings each), which is unrolled with keys already in-place
+    //    (at comptime) and values are just slotted into place (at runtime)
+    //      (meaning the only thing done here at runtime is the values)
+    //
+    //keys must be comptime known (which's why it's a *map* of headers)
+    //
     // NOTE: (for me) if this isn't inlined, it's a segfault
     pub inline fn fromMap(map:anytype) Headers {
-        const len = comptime map.len;
-        const m = @as([len]struct{ []const u8, []const u8 }, map);
-        var res:[len]KVPair = undefined;
-        inline for (m, &res) |p, *r|
-            r.* = .{ .key = p[0], .value = p[1] };
-        return .{ .pairs = res[0..] };
+        var res:[map.len]KVPair = undefined;
+        inline for (map, &res) |p, *r|
+            r.* = .{ .key = comptime p[0], .value = p[1] };
+        return .{ .pairs = res[0..map.len] };
     }
 
     pub fn mk(pairs:[]const KVPair) Headers {
