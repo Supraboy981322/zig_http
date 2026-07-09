@@ -17,6 +17,7 @@ pub const Connection = struct {
     alloc:std.mem.Allocator,
     headers:ParsedHeader,
     io:std.Io,
+    comptime log:Log = .default,
 
     pub fn cancel(self:Connection) HandleResult {
         if (self.stream.shutdown(self.io, .both)) |_|
@@ -27,6 +28,25 @@ pub const Connection = struct {
 };
 
 pub const KVPair = struct{ key:[]const u8, value:[]const u8 };
+
+pub const Log = struct {
+    info:Func,
+    debug:Func,
+    err:Func,
+    warn:Func,
+    request:Func,
+
+    pub const Func = *const fn (comptime []const u8, anytype) void;
+
+    // TODO: custom default
+    pub const default:Log = .{ 
+        .info = &std.log.info,
+        .debug = &std.log.debug,
+        .warn = &std.log.warn,
+        .err = &std.log.err,
+        .request = &std.log.info,
+    };
+};
 
 pub const ParsedHeader = struct {
     method:Method,

@@ -9,7 +9,7 @@ const HandleResult = types.HandleResult;
 
 pub fn main(init:std.process.Init) !u8 {
     const addr:std.Io.net.IpAddress = try .parse("::1", 3289);
-    var server:Server = try .init(init.io, init.gpa, &addr, &handler);
+    var server:Server = try .init(init.io, init.gpa, &addr, &handler, .default);
 
     switch (server.listen()) {
         .ok => |why| std.log.info(
@@ -31,6 +31,9 @@ pub fn main(init:std.process.Init) !u8 {
 pub fn handler(conn:Connection) !HandleResult {
     const stream = conn.stream;
     const headers = conn.headers;
+    const log = conn.log;
+
+    log.request("recieved request", .{});
 
     var writer_buf:[1024]u8 = undefined;
     var writer = stream.writer(conn.io, &writer_buf);

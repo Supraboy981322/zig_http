@@ -7,6 +7,7 @@ io:Io,
 alloc:Alloc,
 addr:*const IpAddr,
 handler:HandlerFn,
+comptime log:Log = .default,
 
 
 const Server = @This();
@@ -29,13 +30,16 @@ const ListenReturn = types.ListenReturn;
 const Connection = types.Connection;
 const HandleResult = types.HandleResult;
 const HandlerFn = types.HandlerFn;
+const Log = types.Log;
 
-pub fn init(io:std.Io, alloc:Alloc, addr:*const IpAddr, handler:HandlerFn) !Server {
+pub fn init(io:std.Io, alloc:Alloc, addr:*const IpAddr, handler:HandlerFn, comptime logger:Log) !Server {
+    logger.debug("initializing...", .{});
     return .{
         .io = io,
         .alloc = alloc,
         .addr = addr,
         .handler = handler,
+        .log = logger,
     };
 }
 
@@ -57,21 +61,26 @@ pub fn listen(self:*Server) ListenReturn {
         else => |e| return .abort(e, "server = addr.listen(...)"),
     };
     defer server.deinit(self.io);
+    self.log.info("listening on port '{d}'", .{self.addr.getPort()});
 
     var group:std.Io.Group = .init;
     defer group.cancel(self.io);
 
     while (true) {
+        self.log.debug("accepting connections...", .{});
         const stream = server.accept(self.io) catch |err| switch (err) {
             error.Unexpected => |e| return .abort(e, "stream = server.accept(...)"),
             error.BlockedByFirewall => |e| return .fail(e, "failed to accept connection"),
             error.Canceled => return .success(.canceled),
             else => continue,
         };
+        self.log.debug("connection (spawning handler shim)...", .{});
         group.concurrent(self.io, handleIoShim, .{ self, stream }) catch |e| switch (e) {
             error.ConcurrencyUnavailable => {
+                self.log.err("...unable to spawn handler (waiting on active connections to finish)", .{});
                 stream.close(self.io); //discard current connection
                 group.await(self.io) catch continue; //wait for other connections to finish
+                self.log.debug("active connections finished", .{});
             },
         };
     }
@@ -90,9 +99,14 @@ fn handleShim(
 ) !void {
     var handle_res:HandleResult = .{};
     defer blk: {
-        if (handle_res.closed) break :blk;
+        self.log.debug("closing connection...", .{});
+        if (handle_res.closed) {
+            self.log.debug("...connection already closed", .{});
+            break :blk;
+        }
         stream.shutdown(self.io, .both) catch break :blk; // TODO: should I handle this?
         stream.close(self.io);
+        self.log.debug("...connection closed", .{});
     }
 
     var arena:std.heap.ArenaAllocator = .init(self.alloc);
@@ -101,12 +115,15 @@ fn handleShim(
 
     var reader_buf:[8192]u8 = undefined; //buf larger for headers
     var reader = stream.reader(self.io, &reader_buf);
+    self.log.debug("spawning handler...", .{});
     handle_res = try self.handler(.{
         .headers = try parseHeader(&reader, alloc),
         .alloc = alloc,
         .stream = stream,
         .io = self.io,
+        .log = self.log,
     });
+    self.log.debug("...handler done", .{});
 }
 
 pub fn isValidHeaderByte(which:enum{ key, value }, b:u8) bool {
