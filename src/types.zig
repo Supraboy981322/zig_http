@@ -68,7 +68,7 @@ pub const Connection = struct {
 
     // WARNING: do not 'Connection.cancel(...)' *and* 'Connection.endResponse(...)'
     pub fn endResponse(self:Connection) std.Io.net.ShutdownError!HandleResult {
-        try self.stream.close(self.io, .both);
+        try self.stream.shutdown(self.io, .both);
         self.stream.close(self.io);
         return .{ .closed = true };
     }
