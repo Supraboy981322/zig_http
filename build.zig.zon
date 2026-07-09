@@ -1,0 +1,15 @@
+.{
+    .name = .zig_http,
+    .version = "0.0.1",
+    .fingerprint = 0x5f12ee51baa6c9d0,
+
+    .minimum_zig_version = "0.16.0",
+
+    .dependencies = .{}, //no (external) dependencies
+
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}
