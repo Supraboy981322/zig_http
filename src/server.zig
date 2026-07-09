@@ -116,13 +116,20 @@ fn handleShim(
     var reader_buf:[8192]u8 = undefined; //buf larger for headers
     var reader = stream.reader(self.io, &reader_buf);
     self.log.debug("spawning handler...", .{});
-    handle_res = try self.handler(.{
+
+    var writer_buf:[1024]u8 = undefined;
+    var writer = stream.writer(self.io, &writer_buf);
+
+    var conn:Connection = .{
         .headers = try parseHeader(&reader, alloc),
         .alloc = alloc,
         .stream = stream,
         .io = self.io,
         .log = self.log,
-    });
+        .reader = &reader,
+        .writer = &writer,
+    };
+    handle_res = try self.handler(&conn);
     self.log.debug("...handler done", .{});
 }
 
