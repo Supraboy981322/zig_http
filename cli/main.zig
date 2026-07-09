@@ -1,9 +1,9 @@
 const std = @import("std");
-const module = @import("module.zig");
+const http = @import("zig_http");
 
-const types = module.types;
+const types = http.types;
 
-const Server = module.Server;
+const Server = http.Server;
 const Connection = types.Connection;
 const HandleResult = types.HandleResult;
 
