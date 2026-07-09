@@ -44,9 +44,9 @@ pub const Connection = struct {
         self.status_sent = true;
     }
 
-    pub const SendHeaderMapError = error{OutOfMemory} || SendHeadersError;
-    pub fn sendHeadersMap(self:Connection, headers:[]const [2][]const u8) SendHeaderMapError!void {
-        try self.sendHeaders(try .fromMap(self.alloc, headers));
+    pub const SendHeadersMapError = error{OutOfMemory} || SendHeadersError;
+    pub fn sendHeadersSlice(self:Connection, headers:[]const [2][]const u8) SendHeadersMapError!void {
+        try self.sendHeaders(try .fromSlice(self.alloc, headers));
     }
 
     pub const SendHeadersError = std.Io.Writer.Error;
@@ -82,7 +82,7 @@ pub const Headers = struct {
 
     // NOTE: the resulting keys and values are still owned by the provided map
     //  (the KVPair slice is allocated, however)
-    pub fn fromMap(alloc:Allocator, map:[]const [2][]const u8) error{OutOfMemory}!Headers {
+    pub fn fromSlice(alloc:Allocator, map:[]const [2][]const u8) error{OutOfMemory}!Headers {
         const res = try alloc.alloc(KVPair, map.len);
         for (map, 0..) |pair, i|
             res[i] = .{ .key = pair[0], .value = pair[1] };
@@ -90,7 +90,7 @@ pub const Headers = struct {
     }
 
     // NOTE: (for me) if this isn't inlined, it's a segfault
-    pub inline fn fromMapFast(map:anytype) Headers {
+    pub inline fn fromMap(map:anytype) Headers {
         const len = comptime map.len;
         const m = @as([len]struct{ []const u8, []const u8 }, map);
         var res:[len]KVPair = undefined;

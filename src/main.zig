@@ -66,7 +66,7 @@ pub fn handler(conn:*Connection) !HandleResult {
     const rendered = res[0..rendered_len];
     var content:std.Io.Reader = .fixed(rendered);
 
-    try conn.beginResponse(.ok, .fromMapFast(.{
+    try conn.beginResponse(.ok, .fromMap(.{
         .{ "Content-Length", len_str },
     }));
     
