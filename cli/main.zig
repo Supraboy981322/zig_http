@@ -7,6 +7,8 @@ const Server = http.Server;
 const Connection = types.Connection;
 const HandleResult = types.HandleResult;
 
+var filename:?[]const u8 = null;
+
 pub fn main(init:std.process.Init) !u8 {
     const addr:std.Io.net.IpAddress = try .parse("::1", 3289);
     var server:Server = try .init(init.io, init.gpa, &addr, &handler, .default);
@@ -29,48 +31,51 @@ pub fn main(init:std.process.Init) !u8 {
 }
 
 pub fn handler(conn:*Connection) !HandleResult {
-    const headers = conn.headers;
     const log = conn.log;
 
     log.request("recieved request", .{});
 
-    var render_buf:std.Io.Writer.Allocating = .init(conn.alloc);
-    defer render_buf.deinit();
+    const requested_page = conn.getPage() orelse "/index.html"; // TODO: arg to set default page
+    var given_file = if (filename) |f| f else requested_page;
+    if (given_file[0] == '/') given_file = given_file[1..];
 
-    try render_buf.writer.print(
-        \\.{{
-        \\    .method = .{t},
-        \\    .page = "{s}",
-        \\    .version = .{{
-        \\        .is_https = {},
-        \\        .num = .{any},
-        \\    }},
-        \\    .headers = &.{{
-    ++ "\n", .{
-        headers.method,
-        headers.page,
-        headers.version.is_https,
-        headers.version.num,
-    });
-    for (headers.headers) |header| try render_buf.writer.print(
-        "        .{{ .key = \"{s}\", .value = \"{s}\" }},\n",
-        .{ header.key, header.value },
-    );
-    try render_buf.writer.print("    }},\n}};\n", .{});
+    var file = std.Io.Dir.cwd().openFile(
+        conn.io, given_file, .{ .mode = .read_only }
+    ) catch |err| switch (err) {
+        inline else => |e| {
+            log.err("failed to open file ({t}): {s}", .{e, given_file});
+            const str =
+                if (e == error.FileNotFound)
+                    "404... (file not found)\n"
+                else // TODO: helper to convert Zig error to HTTP status
+                    "500... (er-umm... something's borked)\n";
+            const str_len = blk: {
+                var buf:[str.len]u8 = undefined;
+                break :blk std.fmt.bufPrint(&buf, "{d}", .{str.len}) catch unreachable;
+            };
+            try conn.beginResponse(.not_found, .fromMap(.{
+                .{ "Content-Length", str_len }
+            }));
+            try conn.writer.interface.writeAll(str);
+            try conn.writer.interface.flush();
+            return try conn.endResponse();
+        }
+    };
+    defer file.close(conn.io);
 
+    const len = try file.length(conn.io);
+    var len_buf:[1024]u8 = undefined;
+    // TODO: there is 100% a more efficient way to do this
+    const len_str = try std.fmt.bufPrint(&len_buf, "{d}", .{len});
 
-    const rendered_len = render_buf.written().len;
-    try render_buf.writer.print("{d}", .{rendered_len});
-    const res = render_buf.written();
-    const len_str = res[rendered_len..];
-    const rendered = res[0..rendered_len];
-    var content:std.Io.Reader = .fixed(rendered);
+    var file_buf:[1024]u8 = undefined;
+    var reader = file.reader(conn.io, &file_buf);
 
     try conn.beginResponse(.ok, .fromMap(.{
         .{ "Content-Length", len_str },
     }));
 
-    _ = try content.streamRemaining(&conn.writer.interface);
+    _ = try reader.interface.streamRemaining(&conn.writer.interface);
     try conn.writer.interface.flush();
 
     return .done(.{});
