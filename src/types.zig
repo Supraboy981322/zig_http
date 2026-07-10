@@ -112,6 +112,15 @@ pub const Headers = struct {
         return .{ .pairs = res[0..map.len] };
     }
 
+    pub fn fromMapComptime(map:anytype) Headers {
+        comptime {
+            var res:[]const KVPair = &.{};
+            for (map) |pair|
+                res = res ++ &[_]KVPair{ .{ .key = pair[0], .value = pair[1] } };
+            return .{ .pairs = res };
+        }
+    }
+
     pub fn mk(pairs:[]const KVPair) Headers {
         return .{ .pairs = pairs };
     }

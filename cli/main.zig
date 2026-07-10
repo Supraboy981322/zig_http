@@ -2,9 +2,11 @@ const std = @import("std");
 const http = @import("zig_http");
 
 const types = http.types;
+const assert = std.debug.assert;
 
 const Server = http.Server;
 const Connection = types.Connection;
+const Headers = types.Headers;
 const HandleResult = types.HandleResult;
 
 var filename:?[]const u8 = null;
@@ -44,18 +46,19 @@ pub fn handler(conn:*Connection) !HandleResult {
     ) catch |err| switch (err) {
         inline else => |e| {
             log.err("failed to open file ({t}): {s}", .{e, given_file});
-            const str =
+            const str = comptime
                 if (e == error.FileNotFound)
                     "404... (file not found)\n"
                 else // TODO: helper to convert Zig error to HTTP status
                     "500... (er-umm... something's borked)\n";
-            const str_len = blk: {
-                var buf:[str.len]u8 = undefined;
-                break :blk std.fmt.bufPrint(&buf, "{d}", .{str.len}) catch unreachable;
+            const headers:Headers = comptime blk: {
+                assert(str.len < 100); //update comptime block
+                const str_len:[]const u8 = &std.fmt.digits2(@intCast(str.len));
+                break :blk .fromMapComptime(&.{
+                    .{ "Content-Length", str_len }
+                });
             };
-            try conn.beginResponse(.not_found, .fromMap(.{
-                .{ "Content-Length", str_len }
-            }));
+            try conn.beginResponse(.not_found, headers);
             try conn.writer.interface.writeAll(str);
             try conn.writer.interface.flush();
             return try conn.endResponse();
