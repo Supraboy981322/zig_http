@@ -102,6 +102,63 @@ pub const Connection = struct {
         try self.writer.interface.flush();
         return try self.endResponse();
     }
+
+};
+
+pub const StatusInfo = struct{
+    code:Status,
+    phrase:[]const u8,
+    class:Status.Class,
+    msg:[]const u8,
+
+    pub const not_found:StatusInfo = .{
+        .code = .not_found,
+        .phrase = Status.phrase(.not_found).?,
+    };
+
+    fn mk_msg(comptime status:Status) []const u8 {
+        comptime {
+            var code = @intFromEnum(status);
+            assert(code >= 100 and code <= 999);
+            var buf:[1024]u8 = undefined;
+            var i:comptime_int = buf.len;
+            while (code >= 100) : (code = @divTrunc(code, 100)) {
+                i -= 2;
+                buf[i..][0..2].* = std.fmt.digits2(@intCast(code % 100));
+            }
+            if (code < 10) {
+                i -= 1;
+                buf[i] = '0' + @as(u8, @intCast(code));
+            } else {
+                i -= 2;
+                buf[i..][0..2].* = std.fmt.digits2(@intCast(code));
+            }
+            var res:[]const u8 = buf[i..];
+
+            res = res ++ "... (";
+            for (@tagName(status)) |b| {
+                if (b == '_')
+                    res = res ++ " "
+                else
+                    res = res ++ &[_]u8{b};
+            }
+            res = res ++ ")";
+            return res;
+        }
+    }
+
+    pub fn mk(status:Status) StatusInfo {
+        assert(status.phrase() != null); //I'm not putting *that* much effort into this
+        switch (status) { inline else => |s| {
+            if (s.phrase() == null) unreachable;
+            return .{
+                .code = s,
+                .phrase = comptime s.phrase().?,
+                .class = comptime s.class(),
+                .msg = comptime mk_msg(s),
+            };
+        } }
+    }
 };
 
 pub const KVPair = struct{ key:[]const u8, value:[]const u8 };
