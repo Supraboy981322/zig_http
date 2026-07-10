@@ -80,6 +80,28 @@ pub const Connection = struct {
             else
                 self.headers.page;
     }
+
+    pub const SendClosingOpts = struct {
+        headers:?Headers = null,
+        status:Status = .ok,
+    };
+
+    pub fn sendStringClosing(self:*Connection, comptime str:[]const u8, opts:SendClosingOpts) !HandleResult {
+        const headers:Headers =
+            if (opts.headers) |headers|
+                headers
+            else comptime blk: {
+                if (str.len > 100) @compileError("TODO: properly stringify length");
+                const str_len:[]const u8 = &std.fmt.digits2(@intCast(str.len));
+                break :blk .fromMapComptime(&.{
+                    .{ "Content-Length", str_len }
+                });
+            };
+        try self.beginResponse(opts.status, headers);
+        try self.writer.interface.writeAll(str);
+        try self.writer.interface.flush();
+        return try self.endResponse();
+    }
 };
 
 pub const KVPair = struct{ key:[]const u8, value:[]const u8 };

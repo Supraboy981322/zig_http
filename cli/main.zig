@@ -51,17 +51,7 @@ pub fn handler(conn:*Connection) !HandleResult {
                     "404... (file not found)\n"
                 else // TODO: helper to convert Zig error to HTTP status
                     "500... (er-umm... something's borked)\n";
-            const headers:Headers = comptime blk: {
-                assert(str.len < 100); //update comptime block
-                const str_len:[]const u8 = &std.fmt.digits2(@intCast(str.len));
-                break :blk .fromMapComptime(&.{
-                    .{ "Content-Length", str_len }
-                });
-            };
-            try conn.beginResponse(.not_found, headers);
-            try conn.writer.interface.writeAll(str);
-            try conn.writer.interface.flush();
-            return try conn.endResponse();
+            return try conn.sendStringClosing(str, .{ .status = .not_found });
         }
     };
     defer file.close(conn.io);
