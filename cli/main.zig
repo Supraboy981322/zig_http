@@ -5,6 +5,7 @@ const types = http.types;
 const assert = std.debug.assert;
 
 const Server = http.Server;
+const Log = types.Log;
 const Connection = types.Connection;
 const Headers = types.Headers;
 const HandleResult = types.HandleResult;
@@ -12,8 +13,23 @@ const HandleResult = types.HandleResult;
 var filename:?[]const u8 = null;
 
 pub fn main(init:std.process.Init) !u8 {
+    const alloc = init.gpa;
+    const args = init.minimal.args.vector;
+
+    const log:Log = .default;
+
+    if (args.len > 1) {
+        // TODO: other args
+        filename = blk: {
+            const c_str = std.mem.span(args[1]);
+            break :blk try alloc.dupe(u8, c_str);
+        };
+        log.info("serving file: {s}", .{filename.?});
+    }
+    defer if (filename) |name| alloc.free(name);
+
     const addr:std.Io.net.IpAddress = try .parse("::1", 3289);
-    var server:Server = try .init(init.io, init.gpa, &addr, &handler, .default);
+    var server:Server = try .init(init.io, init.gpa, &addr, &handler, log);
 
     switch (server.listen()) {
         .ok => |why| std.log.info(
