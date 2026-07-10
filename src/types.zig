@@ -91,8 +91,10 @@ pub const Connection = struct {
             if (opts.headers) |headers|
                 headers
             else blk: {
-                assert(str.len <= 100); // TODO: properly stringify length
-                const str_len:[]const u8 = &std.fmt.digits2(@intCast(str.len));
+                assert(str.len <= std.math.maxInt(u64)); // string too long, just stream it
+                var buf:[20]u8 = undefined;
+                const end = std.fmt.printInt(&buf, str.len, 10, .lower, .{});
+                const str_len:[]const u8 = buf[0..end];
                 break :blk .fromMap(&.{
                     .{ "Content-Length", str_len }
                 });
