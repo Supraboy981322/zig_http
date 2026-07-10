@@ -86,14 +86,14 @@ pub const Connection = struct {
         status:Status = .ok,
     };
 
-    pub fn sendStringClosing(self:*Connection, comptime str:[]const u8, opts:SendClosingOpts) !HandleResult {
+    pub fn sendStringClosing(self:*Connection,str:[]const u8, opts:SendClosingOpts) !HandleResult {
         const headers:Headers =
             if (opts.headers) |headers|
                 headers
-            else comptime blk: {
-                if (str.len > 100) @compileError("TODO: properly stringify length");
+            else blk: {
+                assert(str.len <= 100); // TODO: properly stringify length
                 const str_len:[]const u8 = &std.fmt.digits2(@intCast(str.len));
-                break :blk .fromMapComptime(&.{
+                break :blk .fromMap(&.{
                     .{ "Content-Length", str_len }
                 });
             };
