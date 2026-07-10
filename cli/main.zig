@@ -43,16 +43,10 @@ pub fn handler(conn:*Connection) !HandleResult {
 
     var file = std.Io.Dir.cwd().openFile(
         conn.io, given_file, .{ .mode = .read_only }
-    ) catch |err| switch (err) {
-        inline else => |e| {
-            log.err("failed to open file ({t}): {s}", .{e, given_file});
-            const str = comptime
-                if (e == error.FileNotFound)
-                    "404... (file not found)\n"
-                else // TODO: helper to convert Zig error to HTTP status
-                    "500... (er-umm... something's borked)\n";
-            return try conn.sendStringClosing(str, .{ .status = .not_found });
-        }
+    ) catch |err| {
+        log.err("failed to open file ({t}): {s}", .{err, given_file});
+        const status = http.helpers.fileErrorToStatus(err);
+        return try conn.sendStringClosing(status.msg, .{ .status = status.code });
     };
     defer file.close(conn.io);
 
