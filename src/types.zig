@@ -72,6 +72,14 @@ pub const Connection = struct {
         self.stream.close(self.io);
         return .{ .closed = true };
     }
+
+    pub fn getPage(self:Connection) ?[]const u8 {
+        return
+            if (std.mem.eql(u8, self.headers.page, "/"))
+                null
+            else
+                self.headers.page;
+    }
 };
 
 pub const KVPair = struct{ key:[]const u8, value:[]const u8 };
