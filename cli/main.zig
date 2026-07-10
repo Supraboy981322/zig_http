@@ -67,9 +67,12 @@ pub fn handler(conn:*Connection) !HandleResult {
     defer file.close(conn.io);
 
     const len = try file.length(conn.io);
-    var len_buf:[1024]u8 = undefined;
-    // TODO: there is 100% a more efficient way to do this
-    const len_str = try std.fmt.bufPrint(&len_buf, "{d}", .{len});
+    const len_str = blk: {
+        var buf:[20]u8 = undefined; //len of maxInt(u64)
+        // TODO: still probably a more efficient to do this
+        const end = std.fmt.printInt(&buf, len, 10, .lower, .{});
+        break :blk buf[0..end];
+    };
 
     var file_buf:[1024]u8 = undefined;
     var reader = file.reader(conn.io, &file_buf);
