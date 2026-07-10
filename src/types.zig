@@ -224,6 +224,114 @@ pub const Log = struct {
         .err = &std.log.err,
         .request = &std.log.info,
     };
+
+    pub const Where = union(enum) {
+        file:std.Io.File,
+        stderr,
+        stdout,
+    };
+
+    // TODO: I'm incredibly annoyed with this right now
+    const Default = struct {
+        io:std.Io, //ugh...
+        mut:std.Io.Mutex = .init,
+        where:Where,
+
+        pub fn init(io:std.Io, where:Where) Default {
+            return .{
+                .io = io,
+                .where = where,
+            };
+        }
+
+        pub fn interface(self:*Default) Log {
+            return .{
+                .info = &self.info,
+                .debug = &self.debug,
+                .err = &self.err,
+                .warn = &self.warn,
+                .request = &self.request,
+            };
+        }
+
+        fn generic(
+            self:*Default,
+            color:std.Io.Terminal.Color,
+            comptime tag:[]const u8,
+            comptime msg:[]const u8,
+            stuff:anytype
+        ) void {
+            errdefer unreachable;
+
+            self.mut.lock(self.io) catch return;
+            defer self.mut.unlock(self.io);
+
+            //UNIX time (1970-01-01T00:00:00Z)
+            const time = std.Io.Clock.real.now(self.io).toSeconds();
+            const epoch:std.time.epoch.EpochSeconds = .{ .secs = @intCast(time) };
+            const year, const day, const month = blk: {
+                const yd = epoch.getEpochDay().calculateYearDay();
+                const year = yd.year;
+                const md = yd.calculateMonthDay();
+                break :blk .{
+                    year,
+                    md.day_index,
+                    md.month.numeric(),
+                };
+            };
+            const hour, const minute, const seconds = blk: {
+                const ds = epoch.getDaySeconds();
+                break :blk .{
+                    ds.getHoursIntoDay(),
+                    ds.getMinutesIntoHour(),
+                    ds.getSecondsIntoMinute()
+                };
+            };
+
+            var buf:[1024]u8 = undefined;
+            var file = switch (self.where) {
+                .stdout => std.Io.File.stdout(),
+                .stderr => std.Io.File.stderr(),
+                .file => |f| f,
+            };
+
+            var wr = file.writer(self.io, &buf);
+            const term:std.Io.Terminal = .{
+                .writer = &wr.interface,
+                .mode = std.Io.Terminal.Mode.detect(self.io, file, false, false) catch .no_color,
+            };
+
+            term.setColor(color) catch {};
+            term.writer.writeAll("[" ++ tag ++ "]") catch {};
+            term.setColor(.reset) catch {};
+
+            term.setColor(.bold) catch {};
+            term.writer.print(
+                "({d}/{d}/{d} | {d}:{d}:{d}): ",
+                .{ month, day, year, hour, minute, seconds }
+            ) catch {};
+            term.setColor(.reset) catch {};
+
+            term.writer.print(msg ++ "\n", stuff) catch {};
+            term.writer.flush() catch {};
+        }
+
+        pub fn info(self:*Default, comptime msg:[]const u8, stuff:anytype) void {
+            self.generic(.green, @src().fn_name, msg, stuff);
+        }
+        pub fn debug(self:*Default, comptime msg:[]const u8, stuff:anytype) void {
+            self.generic(.magenta, @src().fn_name, msg, stuff);
+        }
+        pub fn err(self:*Default, comptime msg:[]const u8, stuff:anytype) void {
+            self.generic(.red, @src().fn_name, msg, stuff);
+        }
+        pub fn warn(self:*Default, comptime msg:[]const u8, stuff:anytype) void {
+            self.generic(.yellow, @src().fn_name, msg, stuff);
+        }
+        pub fn request(self:*Default, comptime msg:[]const u8, stuff:anytype) void {
+            self.generic(.bright_blue, @src().fn_name, msg, stuff);
+        }
+    };
 };
 
 pub const ParsedHeader = struct {
