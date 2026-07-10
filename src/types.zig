@@ -142,7 +142,7 @@ pub const StatusInfo = struct{
                 else
                     res = res ++ &[_]u8{b};
             }
-            res = res ++ ")";
+            res = res ++ ")\n";
             return res;
         }
     }
