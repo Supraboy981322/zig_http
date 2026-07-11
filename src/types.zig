@@ -89,6 +89,13 @@ pub const Connection = struct {
             try res.append(self.alloc, sect);
         return try res.toOwnedSlice(self.alloc);
     }
+    pub fn tokenizePageBuffer(self:Connection, buf:[][]const u8) ?usize {
+        const page = self.getPage() orelse return null;
+        var used:usize = 0;
+        var itr = std.mem.tokenizeScalar(u8, page, '/');
+        while (itr.next()) |sect| : (used += 1) buf[used] = sect;
+        return used;
+    }
 
     pub const SendClosingOpts = struct {
         headers:?Headers = null,
