@@ -29,7 +29,7 @@ pub fn main(init:std.process.Init) !u8 {
 }
 
 pub fn handler(conn:*Connection) !HandleResult {
-    const headers = conn.headers;
+    const info = conn.parsed;
     const log = conn.log;
 
     log.request("recieved request", .{});
@@ -47,13 +47,13 @@ pub fn handler(conn:*Connection) !HandleResult {
         \\    }},
         \\    .headers = .{{
     ++ "\n", .{
-        headers.method,
-        headers.page,
-        headers.version.is_https,
-        headers.version.num,
+        info.method,
+        info.page,
+        info.version.is_https,
+        info.version.num,
     });
 
-    var header_itr = headers.headers.iterator();
+    var header_itr = info.headers.iterator();
     while (header_itr.next()) |header|
         try render_buf.writer.print(
             "        .{{ .key = \"{s}\", .value = \"{s}\" }},\n",
@@ -65,7 +65,7 @@ pub fn handler(conn:*Connection) !HandleResult {
         \\    .params = .{{
     ++ "\n", .{});
 
-    var param_itr = headers.params.iterator();
+    var param_itr = info.params.iterator();
     while (param_itr.next()) |p|
         try render_buf.writer.print(
             "        .{{ .key = \"{s}\", .value = \"{s}\" }},\n",

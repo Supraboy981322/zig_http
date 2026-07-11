@@ -19,7 +19,7 @@ pub const HandleResult = struct {
 pub const Connection = struct {
     stream:std.Io.net.Stream,
     alloc:std.mem.Allocator,
-    headers:ParsedHeader,
+    parsed:ParsedHeader,
     io:std.Io,
     comptime log:Log = .default,
     status_sent:bool = false,
@@ -75,10 +75,10 @@ pub const Connection = struct {
 
     pub fn getPage(self:Connection) ?[]const u8 {
         return
-            if (std.mem.eql(u8, self.headers.page, "/"))
+            if (std.mem.eql(u8, self.parsed.page, "/"))
                 null
             else
-                self.headers.page;
+                self.parsed.page;
     }
 
     pub const SendClosingOpts = struct {

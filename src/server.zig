@@ -121,7 +121,7 @@ fn handleShim(
     var writer = stream.writer(self.io, &writer_buf);
 
     var conn:Connection = .{
-        .headers = try parseHeader(&reader, alloc),
+        .parsed = try parseHeader(&reader, alloc),
         .alloc = alloc,
         .stream = stream,
         .io = self.io,
