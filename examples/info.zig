@@ -45,17 +45,32 @@ pub fn handler(conn:*Connection) !HandleResult {
         \\        .is_https = {},
         \\        .num = .{any},
         \\    }},
-        \\    .headers = &.{{
+        \\    .headers = .{{
     ++ "\n", .{
         headers.method,
         headers.page,
         headers.version.is_https,
         headers.version.num,
     });
-    for (headers.headers) |header| try render_buf.writer.print(
-        "        .{{ .key = \"{s}\", .value = \"{s}\" }},\n",
-        .{ header.key, header.value },
-    );
+
+    var header_itr = headers.headers.iterator();
+    while (header_itr.next()) |header|
+        try render_buf.writer.print(
+            "        .{{ .key = \"{s}\", .value = \"{s}\" }},\n",
+            .{ header.key_ptr.*, header.value_ptr.* },
+        );
+
+    try render_buf.writer.print(
+        \\    }},
+        \\    .params = .{{
+    ++ "\n", .{});
+
+    var param_itr = headers.params.iterator();
+    while (param_itr.next()) |p|
+        try render_buf.writer.print(
+            "        .{{ .key = \"{s}\", .value = \"{s}\" }},\n",
+            .{ p.key_ptr.*, p.value_ptr.* }
+        );
     try render_buf.writer.print("    }},\n}};\n", .{});
 
 
