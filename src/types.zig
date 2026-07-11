@@ -81,6 +81,15 @@ pub const Connection = struct {
                 self.parsed.page;
     }
 
+    pub fn tokenizePage(self:Connection) error{OutOfMemory}!?[]const []const u8 {
+        const page = self.getPage() orelse return null;
+        var res:std.ArrayList([]const u8) = .empty;
+        var itr = std.mem.tokenizeScalar(u8, page, '/');
+        while (itr.next()) |sect|
+            try res.append(self.alloc, sect);
+        return try res.toOwnedSlice(self.alloc);
+    }
+
     pub const SendClosingOpts = struct {
         headers:?Headers = null,
         status:Status = .ok,

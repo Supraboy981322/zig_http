@@ -71,8 +71,16 @@ pub fn handler(conn:*Connection) !HandleResult {
             "        .{{ .key = \"{s}\", .value = \"{s}\" }},\n",
             .{ p.key_ptr.*, p.value_ptr.* }
         );
-    try render_buf.writer.print("    }},\n}};\n", .{});
+    try render_buf.writer.print("    }},\n", .{});
 
+    if (try conn.tokenizePage()) |tokenized| {
+        try render_buf.writer.print("    .tokenized_page = &.{{\n", .{});
+        for (tokenized) |sect|
+            try render_buf.writer.print("        \"{s}\",\n", .{sect});
+        try render_buf.writer.print("    }},\n", .{});
+    }
+
+    try render_buf.writer.print("}};\n", .{});
 
     const rendered_len = render_buf.written().len;
     try render_buf.writer.print("{d}", .{rendered_len});
