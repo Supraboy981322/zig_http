@@ -149,8 +149,10 @@ pub fn parseHeader(
     alloc:std.mem.Allocator
 ) !ParsedHeader {
     const reader = &stream_reader.interface;
-    var headers:std.ArrayList(types.KVPair) = .empty;
-    errdefer headers.deinit(alloc); //only deinit on err (otherwise deinit is no-op)
+    var headers:std.StringHashMap([]const u8) = .init(alloc);
+    var params:std.StringHashMap([]const u8) = .init(alloc);
+    errdefer headers.deinit(); //only deinit on err (otherwise deinit is no-op)
+    errdefer params.deinit();
 
     //newline included so the last segment (the version) can just read to the
     //  carrage return for the chunk
@@ -168,12 +170,11 @@ pub fn parseHeader(
         };
     };
 
-    const page, const params = blk: {
+    const page = blk: {
         const url = try status_reader.takeDelimiter(' ') orelse {
             return error.InvalidRequest; //page
         };
         var page:[]const u8 = url;
-        var params:std.StringHashMap([]const u8) = .init(alloc);
         if (std.mem.cutScalar(u8, page, '?')) |halves| {
             page = halves[0];
             var itr = std.mem.splitScalar(u8, halves[1], '&');
@@ -189,7 +190,7 @@ pub fn parseHeader(
         //  if (!options.SERVER_case_sensitive_pages) {
         //      for (page) |*b| b.* = toLower(b.*);
         //  }
-        break :blk .{ try alloc.dupe(u8, page), params };
+        break :blk try alloc.dupe(u8, page);
     };
 
     const version:ParsedHeader.Version = blk: {
@@ -276,7 +277,7 @@ pub fn parseHeader(
                 const slice = raw[start..end+1];
                 break :blk try alloc.dupe(u8, slice);
             };
-            try headers.append(alloc, .{ .key = key, .value = value });
+            try headers.put(key, value);
         }
     }
 
@@ -286,6 +287,6 @@ pub fn parseHeader(
         .page = page,
         .params = params,
         .version = version,
-        .headers = try headers.toOwnedSlice(alloc),
+        .headers = headers,
     };
 }

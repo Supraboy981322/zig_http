@@ -339,7 +339,7 @@ pub const ParsedHeader = struct {
     page:[]const u8,
     params:std.StringHashMap([]const u8),
     version:Version,
-    headers:[]const KVPair,
+    headers:std.StringHashMap([]const u8),
 
     pub const Version = struct {
         is_https:bool,
