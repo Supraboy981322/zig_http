@@ -9,7 +9,7 @@ const HandleResult = types.HandleResult;
 
 pub fn main(init:std.process.Init) !u8 {
     const addr:std.Io.net.IpAddress = try .parse("::1", 3289);
-    var server:Server = try .init(init.io, init.gpa, &addr, &handler, .default);
+    var server:Server = try .init(init.io, init.gpa, &addr, &handler, .default, null);
 
     switch (server.listen()) {
         .ok => |why| std.log.info(

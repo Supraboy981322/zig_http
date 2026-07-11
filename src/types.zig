@@ -17,6 +17,7 @@ pub const HandleResult = struct {
 };
 
 pub const Connection = struct {
+    ctx:*anyopaque,
     stream:std.Io.net.Stream,
     alloc:std.mem.Allocator,
     parsed:ParsedHeader,
@@ -104,7 +105,7 @@ pub const Connection = struct {
         status:Status = .ok,
     };
 
-    pub fn sendStringClosing(self:*Connection,str:[]const u8, opts:SendClosingOpts) !HandleResult {
+    pub fn sendStringClosing(self:*Connection, str:[]const u8, opts:SendClosingOpts) !HandleResult {
         const headers:Headers =
             if (opts.headers) |headers|
                 headers

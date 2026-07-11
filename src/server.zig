@@ -8,6 +8,7 @@ alloc:Alloc,
 addr:*const IpAddr,
 handler:HandlerFn,
 comptime log:Log = .default,
+ctx:*anyopaque,
 
 
 const Server = @This();
@@ -32,9 +33,10 @@ const HandleResult = types.HandleResult;
 const HandlerFn = types.HandlerFn;
 const Log = types.Log;
 
-pub fn init(io:std.Io, alloc:Alloc, addr:*const IpAddr, handler:HandlerFn, comptime logger:Log) !Server {
+pub fn init(io:std.Io, alloc:Alloc, addr:*const IpAddr, handler:HandlerFn, comptime logger:Log, ctx:?*anyopaque) !Server {
     logger.debug("initializing...", .{});
     return .{
+        .ctx = ctx orelse undefined,
         .io = io,
         .alloc = alloc,
         .addr = addr,
@@ -121,6 +123,7 @@ fn handleShim(
     var writer = stream.writer(self.io, &writer_buf);
 
     var conn:Connection = .{
+        .ctx = self.ctx,
         .parsed = try parseHeader(&reader, alloc),
         .alloc = alloc,
         .stream = stream,

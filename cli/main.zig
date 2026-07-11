@@ -29,7 +29,7 @@ pub fn main(init:std.process.Init) !u8 {
     defer if (filename) |name| alloc.free(name);
 
     const addr:std.Io.net.IpAddress = try .parse("::1", 3289);
-    var server:Server = try .init(init.io, init.gpa, &addr, &handler, log);
+    var server:Server = try .init(init.io, init.gpa, &addr, &handler, log, null);
 
     switch (server.listen()) {
         .ok => |why| std.log.info(
