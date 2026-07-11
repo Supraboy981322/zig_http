@@ -277,6 +277,9 @@ pub fn parseHeader(
                 const slice = raw[start..end+1];
                 break :blk try alloc.dupe(u8, slice);
             };
+            // NOTE: clobbering is ignored
+            //  since it's allocated with an arena that only
+            //    lasts the lifetime of the connection
             try headers.put(key, value);
         }
     }
