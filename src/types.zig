@@ -87,6 +87,7 @@ pub const Connection = struct {
         var itr = std.mem.tokenizeScalar(u8, page, '/');
         while (itr.next()) |sect|
             try res.append(self.alloc, sect);
+        if (res.items.len == 0) return null;
         return try res.toOwnedSlice(self.alloc);
     }
     pub fn tokenizePageBuffer(self:Connection, buf:[][]const u8) ?usize {
@@ -94,6 +95,7 @@ pub const Connection = struct {
         var used:usize = 0;
         var itr = std.mem.tokenizeScalar(u8, page, '/');
         while (itr.next()) |sect| : (used += 1) buf[used] = sect;
+        if (used == 0) return null;
         return used;
     }
 
