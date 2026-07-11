@@ -337,6 +337,7 @@ pub const Log = struct {
 pub const ParsedHeader = struct {
     method:Method,
     page:[]const u8,
+    params:std.StringHashMap([]const u8),
     version:Version,
     headers:[]const KVPair,
 

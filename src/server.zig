@@ -168,15 +168,28 @@ pub fn parseHeader(
         };
     };
 
-    const page = blk: {
-        const str = try status_reader.takeDelimiter(' ') orelse {
+    const page, const params = blk: {
+        const url = try status_reader.takeDelimiter(' ') orelse {
             return error.InvalidRequest; //page
         };
+        var page:[]const u8 = url;
+        var params:std.StringHashMap([]const u8) = .init(alloc);
+        if (std.mem.cutScalar(u8, page, '?')) |halves| {
+            page = halves[0];
+            var itr = std.mem.splitScalar(u8, halves[1], '&');
+            while (itr.next()) |pair| {
+                const key, const value = std.mem.cutScalar(u8, pair, '=') orelse .{ pair, "" };
+                if (key.len == 0) continue;
+                const duped_key = try alloc.dupe(u8, key);
+                const duped_value = try alloc.dupe(u8, value);
+                try params.put(duped_key, duped_value);
+            }
+        }
         // TODO:
         //  if (!options.SERVER_case_sensitive_pages) {
-        //      for (str) |*b| b.* = toLower(b.*);
+        //      for (page) |*b| b.* = toLower(b.*);
         //  }
-        break :blk try alloc.dupe(u8, str);
+        break :blk .{ try alloc.dupe(u8, page), params };
     };
 
     const version:ParsedHeader.Version = blk: {
@@ -271,6 +284,7 @@ pub fn parseHeader(
     return .{
         .method = method,
         .page = page,
+        .params = params,
         .version = version,
         .headers = try headers.toOwnedSlice(alloc),
     };
