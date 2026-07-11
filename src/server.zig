@@ -181,6 +181,7 @@ pub fn parseHeader(
             while (itr.next()) |pair| {
                 const key, const value = std.mem.cutScalar(u8, pair, '=') orelse .{ pair, "" };
                 if (key.len == 0) continue;
+                // TODO: validate these
                 const duped_key = try alloc.dupe(u8, key);
                 const duped_value = try alloc.dupe(u8, value);
                 try params.put(duped_key, duped_value);
@@ -248,7 +249,17 @@ pub fn parseHeader(
             const key = blk: {
                 const raw = (try re.takeDelimiter(':')) orelse return error.InvalidHeader;
                 assert(raw[raw.len-1] != ':', "delimiter was inclusive");
-                for (raw) |*b| b.* = toLower(b.*);
+                //attempt to conform to 'Header-Key' format
+                var upper:bool = true;
+                for (raw) |*b| {
+                    if (upper) {
+                        b.* = toUpper(b.*);
+                        upper = false;
+                    } else {
+                        if (b.* == '-') upper = true;
+                        b.* = toLower(b.*);
+                    }
+                }
                 break :blk try alloc.dupe(u8, raw);
             };
             const value = blk: {
